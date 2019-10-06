@@ -8,7 +8,16 @@ from time import sleep
 		
 		
 def main():
-	
+	'''
+	print(type(ord('a')))
+	testing_str = input("Enter a number: ")
+	print("1", type(testing_str), testing_str)
+	testing = int(testing_str)
+	print("2", type(testing), testing)
+	print("3 {0:b}".format(testing))
+	print(testing)
+	'''
+
 	# Initialize I2C (SMBus)
 	bus = smbus.SMBus(1)
 	arduino_addr = 0x7f
@@ -16,7 +25,7 @@ def main():
 	
 	
 	'''
-		Some setup stuff
+		Disable motors
 	'''
 	# Disable the motors so we can manually manipulate the machine.
 	print("Disabling motors")
@@ -36,12 +45,44 @@ def main():
 			# Sending 'q' or other letters doesn't appear to be the slightest problem
 			#	later on, thankfully.
 	except OSError:
-		print("OSError: Failed to write to specified peripheral")
+		print("OSError: Failed to disable motor drivers")
 		exit(1)
 	
-	# Tell Arduino to zero out all values. 
-	input("Hit return when Arm is rotated such that wires won't tangle and Slider is at bottom-most position")
+	print("Make sure the Arm is rotated such that the motor wires won't twist and Slider is at bottom-most position")
 	
+	
+	'''
+		Get number of pictures per rotation and number of levels of pictures
+		from user.
+	'''
+	# Input from user: how many pictures to take each rotation.
+	while True:
+		try:
+			num_photos_per_rev = int(input("Number of pictures to take per rotation: "))
+			break  # exit the loop if the input successfully converted to a number
+		except ValueError:
+			print("Invalid input: num_photos_per_rev. Numbers only please.")
+	
+	# How many levels of pictures to take, how many rotations
+	while True:
+		try:
+			num_levels = int(input("Number of levels/rotations to make: "))
+			break  # exit the loop if the input successfully converted to a number
+		except ValueError:
+			print("Invalid input: num_levels. Numbers only please.")
+	
+	# Send both to Arduino.
+	print("Sending input to arduino")
+	try:
+		bus.write_i2c_block_data(arduino_addr, 0, [num_photos_per_rev, num_levels])
+	except OSError:
+		print("OSError: Failed to send num_levels.")
+		exit(1)
+	
+	
+	'''
+		Enable motors
+	'''
 	# Re-enable Arduino when this is done.
 	print("Enabling motors")
 	try:
@@ -51,6 +92,9 @@ def main():
 		exit(1)
 	
 	
+	'''
+		Picture loop
+	'''
 	while True:
 	
 		my_move = ord(input("\nGive direction: "))

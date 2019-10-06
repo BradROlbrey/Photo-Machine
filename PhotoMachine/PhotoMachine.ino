@@ -13,7 +13,7 @@
 #define R_SENSE 0.11f 
 TMC2208Stepper driver(SW_RX, SW_TX, R_SENSE);
 
-#define MICROSTEPS 1
+#define MICROSTEPS 256L  // Don't do zero; I changed the library with the first program that has this comment.
 
 /*
  *  AccelStepper
@@ -33,11 +33,15 @@ AccelStepper *stepper_line;
 /*
  *  Photo stuff
  */
-const int STEPS_PER_REV_ARM = 200 * (MICROSTEPS+1);
-const int NUM_PHOTOS_ARM = 10;  // Number of pictures to take all the way around the object.
-const double STEPS_PER_PHOTO = 25 * (MICROSTEPS+1); //STEPS_PER_REV_ARM / (double) NUM_PHOTOS_ARM;
+// Don't think these need to be volatile, but just in case.
+volatile int num_photos_per_rev = NULL;  // Number of pictures to take all the way around the object.
+volatile int num_levels = NULL;  // Number of rotations to make, number of times camera moves up.
+  
+long steps_per_photo_around;  // To be assigned after receiving photos per rotation
   // (steps / rev) / (photos / rev) => (steps / photo)
-  // May not always divide cleanly, want to make sure to go full 360 degree rotation!
+  // May not always divide cleanly, but it's good enough with our epic microstepping, and we'll
+  //  be switching direction anyways, so not going to do type double for now.
+long steps_per_level;
 
 bool arm_dir = false;
 bool line_dir = false;
@@ -48,6 +52,11 @@ bool line_dir = false;
 volatile char next_byte = ' ';  // Stores the value from Wire.read().
 volatile byte moving = 0;
 
+/*
+ *  Serial.printing
+ */
+unsigned long prev_time;
+unsigned int print_interval;
 
 
 void setup() {
@@ -56,14 +65,13 @@ void setup() {
   /*
    *  TMC2208 Driver
    */
-  driver.beginSerial(9600);       // SW UART drivers
+  driver.beginSerial(9600);     // SW UART drivers
 
   driver.begin();                 // SPI: Init CS pins and possible SW SPI pins
                                   // UART: Init SW UART (if selected) with default 115200 baudrate
   driver.toff(5);                 // Enables driver in software
   driver.microsteps(MICROSTEPS);          // Set microsteps to 1/16th
 
-  driver.rms_current(200);        // Set motor RMS current (done over UART >:)
   driver.I_scale_analog(1);
   driver.internal_Rsense(0);
   //driver.intpol(0);
@@ -82,8 +90,8 @@ void setup() {
   digitalWrite(ENA_PIN, HIGH);  // HIGH is disabled
   
   stepper_arm = new AccelStepper(step_arm, step_back_arm);
-  stepper_arm->setMaxSpeed(10 * (MICROSTEPS+1));
-  stepper_arm->setAcceleration(10 * (MICROSTEPS+1));
+  stepper_arm->setMaxSpeed(10L * MICROSTEPS);
+  stepper_arm->setAcceleration(10L * MICROSTEPS);
   
   pinMode(ARM_STEP_PIN, OUTPUT);
   digitalWrite(ARM_STEP_PIN, LOW);
@@ -91,8 +99,8 @@ void setup() {
   digitalWrite(ARM_DIR_PIN, LOW);
   
   stepper_line = new AccelStepper(step_line, step_back_line);
-  stepper_line->setMaxSpeed(10 * (MICROSTEPS+1));
-  stepper_line->setAcceleration(10 * (MICROSTEPS+1));
+  stepper_line->setMaxSpeed(100L * MICROSTEPS);
+  stepper_line->setAcceleration(80L * MICROSTEPS);
   
   pinMode(LINE_STEP_PIN, OUTPUT);
   digitalWrite(LINE_STEP_PIN, LOW);
@@ -107,19 +115,59 @@ void setup() {
   Wire.onReceive(receiveEvent);   // Register event for receiving data from master
   Wire.onRequest(requestEvent);   // Register event for sending data to master upon request
 
-  
+  /*
+   *  Serial
+   */
   while (!Serial);  // Wait for the Serial monitor, apparently it's s/w instead of h/w
   Serial.println("Hello, World!");  // so it takes longer to initialize.
+
+  /*
+   *  Photo stuff
+   */
+  const long TOTAL_STEPS_AROUND = 200L * MICROSTEPS;
+  const long TOTAL_STEPS_UP = 350L * MICROSTEPS;
+  Serial.println("ASDF");
+  Serial.println(TOTAL_STEPS_AROUND);
+  Serial.println(TOTAL_STEPS_UP);
   
-  //Serial.print("Steps per photo: ");
-  //Serial.println(STEPS_PER_PHOTO);
+  print_interval = 5000;
+  prev_time = millis() - print_interval;
+  while (num_photos_per_rev == NULL ||
+         num_levels == NULL) {
+    if (millis() - prev_time > print_interval) {
+      Serial.println("Waiting to receive num_photos and num_levels");
+      prev_time += print_interval;
+    }
+    //delay(5000);  This does not get interrupted by I2C.
+  }
+  print_interval = 250;
+  
+  Serial.println();
+  
+  steps_per_photo_around = TOTAL_STEPS_AROUND / num_photos_per_rev;
+  //Serial.print("Steps per full rotation: ");
+  //Serial.print(TOTAL_STEPS_AROUND);
+  Serial.print("Pictures per rotation: ");
+  Serial.println(num_photos_per_rev);
+  //Serial.print("     Steps per picture: ");
+  //Serial.println(steps_per_photo_around);
+  
+  steps_per_level = TOTAL_STEPS_UP / num_levels;
+  //Serial.print("Total steps up: ");
+  //Serial.print(TOTAL_STEPS_UP);
+  Serial.print("Number of levels: ");
+  Serial.println(num_levels);
+  //Serial.print("     Steps per level: ");
+  //Serial.println(steps_per_level);
+  
+  Serial.print("Total number of pictures to take: ");
+  Serial.println(num_photos_per_rev * num_levels);
+
+  Serial.println();
 }
 
-unsigned long prev_time;
-unsigned int print_interval = 250;
-
 void loop() {
-  driver.microsteps(MICROSTEPS);  // Because I keep powering the driver after the arduino...
+  driver.microsteps(MICROSTEPS);  // Because I keep powering the drivers after the arduino...
 
   while (stepper_arm->distanceToGo() > 0 ||
         stepper_line->distanceToGo() > 0
@@ -154,25 +202,29 @@ void loop() {
     case 'a':  // Rotate arm counter-clockwise
       Serial.println('a');
       digitalWrite(ARM_DIR_PIN, LOW);
-      stepper_arm->move(STEPS_PER_PHOTO);
+      stepper_arm->move(steps_per_photo_around);
+      Serial.print("Pictures per rotation: ");
+      Serial.println(num_photos_per_rev);
+      Serial.print("\tStepper arm:  ");
+      Serial.println(stepper_arm->distanceToGo());
       break;
       
     case 'd':  // Rotate arm clockwise
       Serial.println('d');
       digitalWrite(ARM_DIR_PIN, HIGH);
-      stepper_arm->move(STEPS_PER_PHOTO);
+      stepper_arm->move(steps_per_photo_around);
       break;
       
     case 'w':  // Slide camera up
       Serial.println('w');
       digitalWrite(LINE_DIR_PIN, HIGH);
-      stepper_line->move(STEPS_PER_PHOTO);
+      stepper_line->move(steps_per_level);
       break;
       
     case 's':  // Slide camera down
       Serial.println('s');
       digitalWrite(LINE_DIR_PIN, LOW);
-      stepper_line->move(STEPS_PER_PHOTO);
+      stepper_line->move(steps_per_level);
       break;
 
     case 'e':  // Enable motors
@@ -197,8 +249,18 @@ void loop() {
 
 // Receive data from Pi
 void receiveEvent(int howMany) {
-  next_byte = Wire.read();
-  moving = 1;
+  if (howMany == 1) {
+    // Receiving the usual wasd or qe
+    next_byte = Wire.read();
+    moving = 1;
+  }
+  else {
+    // Receiving two important setup integers (actually they're bytes, so we can't do more than
+    //  255? or 127? around or about, but that can be expanded some other time if necessary).
+    int dont_care = Wire.read();
+    num_photos_per_rev = Wire.read();
+    num_levels = Wire.read();
+  }
 }
 // Send data to Pi
 void requestEvent() {
