@@ -3,8 +3,12 @@
 #include <AccelStepper.h>
 
 
-#define ARM_DIR_PIN          2  // Direction
-#define ARM_STEP_PIN         3  // Step
+#define ARM_DIR_PIN         2  // Direction
+#define ARM_STEP_PIN        3  // Step
+
+#define LINE_DIR_PIN        5
+#define LINE_STEP_PIN       6
+
 
 /*
  *  TMC2208 Driver
@@ -20,6 +24,7 @@ TMC2208Stepper driver(SW_RX, SW_TX, R_SENSE);
  *  AccelStepper
  */
 AccelStepper *stepper_arm;  // Need step_forw to be initialized first, so wait until setup().
+AccelStepper *stepper_line;
 
 
 /*
@@ -32,6 +37,7 @@ const double STEPS_PER_PHOTO = 25 * (MICROSTEPS+1); //STEPS_PER_REV_ARM / (doubl
   // May not always divide cleanly, want to make sure to go full 360 degree rotation!
 
 bool arm_dir = false;
+bool line_dir = false;
 
 
 void setup() {
@@ -73,10 +79,21 @@ void setup() {
   digitalWrite(ARM_DIR_PIN, LOW);
 
   
+  stepper_line = new AccelStepper(step_line, step_back_line);
+  stepper_line->setMaxSpeed(10 * (MICROSTEPS+1));
+  stepper_line->setAcceleration(10 * (MICROSTEPS+1));
+  
+  
+  pinMode(LINE_STEP_PIN, OUTPUT);
+  digitalWrite(LINE_STEP_PIN, LOW);
+  pinMode(LINE_DIR_PIN, OUTPUT);
+  digitalWrite(LINE_DIR_PIN, LOW);
+
+  
   while (!Serial);  // Wait for the Serial monitor, apparently it's s/w instead of h/w
   Serial.println("Hello, World!");  // so it takes longer to initialize.
 
-  one_move();
+  //one_move();
   
   //Serial.print("Steps per photo: ");
   //Serial.println(STEPS_PER_PHOTO);
@@ -92,33 +109,66 @@ void loop() {
 
   if (Serial.available()) {
     next_byte = Serial.read();
-    Serial.read();
-    Serial.print("Moving\t");
-    Serial.print(next_byte);
+    if (next_byte != '\n') {
+      Serial.print("Moving\t");
+      Serial.print(next_byte);
+    }
 
 
     switch (next_byte) {
+      
+      case 'w':  // Slide camera up
+        Serial.print("\tw");
+        
+        if (!line_dir) {
+          line_dir = true;
+          digitalWrite(LINE_DIR_PIN, line_dir);
+        }
+        one_move_line();
+        
+        break;
+        
+      case 's':  // Slide camera down
+        Serial.print("\ts");
+        
+        if (line_dir) {
+          line_dir = false;
+          digitalWrite(LINE_DIR_PIN, line_dir);
+        }
+        one_move_line();
+        
+        break;
         
       case 'a':  // Rotate arm counter-clockwise
         Serial.print("\ta");
+        
         if (arm_dir) {
           arm_dir = false;
           digitalWrite(ARM_DIR_PIN, arm_dir);
         }
+        one_move_arm();
+        
         break;
+        
       case 'd':  // Rotate arm clockwise
         Serial.print("\td");
+        
         if (!arm_dir) {
           arm_dir = true;
           digitalWrite(ARM_DIR_PIN, arm_dir);
         }
+        one_move_arm();
+        
         break;
 
+      case '\n':
+        break;
+      
       default:
         Serial.print("Invalid input, wasd only plz");
     }
-    one_move();
-    Serial.println();
+    if (next_byte != '\n')
+      Serial.println();
     
     //Serial.println(++counter);
   }
@@ -126,11 +176,18 @@ void loop() {
 }
 
 
-void one_move() {
+void one_move_arm() {
   stepper_arm->move(STEPS_PER_PHOTO);
   
   while (stepper_arm->distanceToGo() > 0) {
     stepper_arm->run();
+  }
+}
+void one_move_line(){
+  stepper_line->move(STEPS_PER_PHOTO);
+  
+  while (stepper_line->distanceToGo() > 0) {
+    stepper_line->run();
   }
 }
 
@@ -149,3 +206,17 @@ void step_arm() {
   */
 }
 void step_back_arm() { /* Just reverse direction and call step_arm() */ }
+
+void step_line() {
+  digitalWrite(LINE_STEP_PIN, HIGH);
+  digitalWrite(LINE_STEP_PIN, LOW);
+  
+  //curr_time = micros();
+  //Serial.print(++counter);
+  //Serial.print('\t');
+  //Serial.println(curr_time - prev_time);
+  //Serial.print('\t');
+  //Serial.println(1000000/(curr_time - prev_time));
+  //prev_time = micros();
+}
+void step_back_line() { ; }
