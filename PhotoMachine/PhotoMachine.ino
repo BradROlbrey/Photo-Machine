@@ -3,18 +3,18 @@
 #include <AccelStepper.h>
 
 
-#define ARM_DIR_PIN         2  // Direction
-#define ARM_STEP_PIN        3  // Step
+#define ARM_DIR_PIN         5  // Direction
+#define ARM_STEP_PIN        6  // Step
 
-#define LINE_DIR_PIN        5
-#define LINE_STEP_PIN       6
+#define LINE_DIR_PIN        8
+#define LINE_STEP_PIN       9
 
 
 /*
  *  TMC2208 Driver
  */
-#define SW_RX  11  // SoftwareSerial receive pin
-#define SW_TX  10  // SoftwareSerial transmit pin
+#define SW_RX  12  // SoftwareSerial receive pin
+#define SW_TX  11  // SoftwareSerial transmit pin
 #define R_SENSE 0.11f 
 TMC2208Stepper driver(SW_RX, SW_TX, R_SENSE);
 
@@ -106,6 +106,8 @@ char next_byte;
 
 void loop() {
   driver.microsteps(MICROSTEPS);  // Because I keep powering the driver after the arduino...
+
+  // TODO: WASD these serial reads
 
   if (Serial.available()) {
     next_byte = Serial.read();
