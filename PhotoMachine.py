@@ -8,15 +8,6 @@ from time import sleep
 		
 		
 def main():
-	'''
-	print(type(ord('a')))
-	testing_str = input("Enter a number: ")
-	print("1", type(testing_str), testing_str)
-	testing = int(testing_str)
-	print("2", type(testing), testing)
-	print("3 {0:b}".format(testing))
-	print(testing)
-	'''
 
 	# Initialize I2C (SMBus)
 	bus = smbus.SMBus(1)
@@ -42,6 +33,8 @@ def main():
 		sleep(.1)
 			# For some reason, sending first 'q' is unreliable. Delay does not fix,
 			#	so sending multiple q's with small delays.
+			# Oddly enough, the Arduino's receive function recognizes the 'q', but
+			#	then it never goes into the switch statement.
 			# Sending 'q' or other letters doesn't appear to be the slightest problem
 			#	later on, thankfully.
 	except OSError:
@@ -75,6 +68,7 @@ def main():
 	print("Sending input to arduino")
 	try:
 		bus.write_i2c_block_data(arduino_addr, 0, [num_photos_per_rev, num_levels])
+		sleep(.1)  # Give some time for the Arduino to process back-to-back I2C comms.
 	except OSError:
 		print("OSError: Failed to send num_levels.")
 		exit(1)
@@ -87,30 +81,49 @@ def main():
 	print("Enabling motors")
 	try:
 		bus.write_byte(arduino_addr, ord('e'))  # 'e' for enable motors!
+		sleep(.1)
 	except OSError:
-		print("OSError: Failed to write to specified peripheral")
+		print("OSError: Failed to enable motor drivers")
 		exit(1)
 	
 	
 	'''
 		Picture loop
 	'''
-	while True:
+	# We assume we start at the bottom, and only need to go up.
+	# We will start by going clockwise.
+	rotation_dir = 'd'
 	
-		my_move = ord(input("\nGive direction: "))
-			# ord(str) gets the ascii value of str, so we can send the
-			#	input as an int over I2C.
-		
-		if my_move == ord('e') or my_move == ord('q'):
-			print("'" + str(my_move) + "'")
-			try:
-				bus.write_byte(arduino_addr, my_move)  # 'e' for enable motors!
-			except OSError:
-				print("OSError: Failed to write to specified peripheral")
-		else:
-			scoot_camera(bus, my_move, arduino_addr)
+	# for each level
+	for i in range(num_levels):
+		# for each picture in the rotation
+		for j in range(num_photos_per_rev):
 			print("Taking picture")
-			#sleep(2)  # Take a picture
+			sleep(1)  # Take a picture
+			
+			if j != num_photos_per_rev-1:
+				scoot_camera(bus, ord(rotation_dir), arduino_addr)
+			# else continue
+			# Need the, say, 5 photos. But only want 4 moves. So skip move on last loop.
+
+		# Move the camera up after a full rotation.
+		# ord(str) gets the ascii value of str, so we can send the
+		#	input as an int over I2C.
+		if i != num_levels-1:
+			scoot_camera(bus, ord('w'), arduino_addr)
+		# Need the, say, 3 levels. But only want 2 moves. So skip move on last loop.
+			
+		# Change the direction.
+		if rotation_dir == 'd':
+			rotation_dir = 'a'
+		elif rotation_dir == 'a':
+			rotation_dir = 'd'
+	
+	print("Finished! Disabling motor drivers")
+	try:
+		bus.write_byte(arduino_addr, ord('q'))
+	except OSError:
+		print("OSError: Failed disable motor drivers")
 		
 
 def scoot_camera(bus, direction, arduino_addr):

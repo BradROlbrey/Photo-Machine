@@ -90,8 +90,8 @@ void setup() {
   digitalWrite(ENA_PIN, HIGH);  // HIGH is disabled
   
   stepper_arm = new AccelStepper(step_arm, step_back_arm);
-  stepper_arm->setMaxSpeed(10L * MICROSTEPS);
-  stepper_arm->setAcceleration(10L * MICROSTEPS);
+  stepper_arm->setMaxSpeed(50L * MICROSTEPS);
+  stepper_arm->setAcceleration(50L * MICROSTEPS);
   
   pinMode(ARM_STEP_PIN, OUTPUT);
   digitalWrite(ARM_STEP_PIN, LOW);
@@ -99,7 +99,7 @@ void setup() {
   digitalWrite(ARM_DIR_PIN, LOW);
   
   stepper_line = new AccelStepper(step_line, step_back_line);
-  stepper_line->setMaxSpeed(100L * MICROSTEPS);
+  stepper_line->setMaxSpeed(120L * MICROSTEPS);
   stepper_line->setAcceleration(80L * MICROSTEPS);
   
   pinMode(LINE_STEP_PIN, OUTPUT);
@@ -126,9 +126,6 @@ void setup() {
    */
   const long TOTAL_STEPS_AROUND = 200L * MICROSTEPS;
   const long TOTAL_STEPS_UP = 350L * MICROSTEPS;
-  Serial.println("ASDF");
-  Serial.println(TOTAL_STEPS_AROUND);
-  Serial.println(TOTAL_STEPS_UP);
   
   print_interval = 5000;
   prev_time = millis() - print_interval;
@@ -138,28 +135,18 @@ void setup() {
       Serial.println("Waiting to receive num_photos and num_levels");
       prev_time += print_interval;
     }
-    //delay(5000);  This does not get interrupted by I2C.
   }
   print_interval = 250;
   
   Serial.println();
   
   steps_per_photo_around = TOTAL_STEPS_AROUND / num_photos_per_rev;
-  //Serial.print("Steps per full rotation: ");
-  //Serial.print(TOTAL_STEPS_AROUND);
+  steps_per_level = TOTAL_STEPS_UP / num_levels;
+  
   Serial.print("Pictures per rotation: ");
   Serial.println(num_photos_per_rev);
-  //Serial.print("     Steps per picture: ");
-  //Serial.println(steps_per_photo_around);
-  
-  steps_per_level = TOTAL_STEPS_UP / num_levels;
-  //Serial.print("Total steps up: ");
-  //Serial.print(TOTAL_STEPS_UP);
   Serial.print("Number of levels: ");
   Serial.println(num_levels);
-  //Serial.print("     Steps per level: ");
-  //Serial.println(steps_per_level);
-  
   Serial.print("Total number of pictures to take: ");
   Serial.println(num_photos_per_rev * num_levels);
 
@@ -168,13 +155,14 @@ void setup() {
 
 void loop() {
   driver.microsteps(MICROSTEPS);  // Because I keep powering the drivers after the arduino...
-
+  
+  prev_time = millis() - print_interval;
   while (stepper_arm->distanceToGo() > 0 ||
         stepper_line->distanceToGo() > 0
     ) {
     // We check distToGo instead of moving so the switch statement is guaranteed to run first.
     // Otherwise we could end up in here, set moving = 0, and get mad.
-    
+  
     stepper_arm->run();
     stepper_line->run();
 
@@ -199,51 +187,51 @@ void loop() {
   switch (next_byte) {
     case ' ': break;
       
-    case 'a':  // Rotate arm counter-clockwise
-      Serial.println('a');
-      digitalWrite(ARM_DIR_PIN, LOW);
-      stepper_arm->move(steps_per_photo_around);
-      Serial.print("Pictures per rotation: ");
-      Serial.println(num_photos_per_rev);
-      Serial.print("\tStepper arm:  ");
-      Serial.println(stepper_arm->distanceToGo());
-      break;
-      
     case 'd':  // Rotate arm clockwise
       Serial.println('d');
+      digitalWrite(ARM_DIR_PIN, LOW);
+      stepper_arm->move(steps_per_photo_around);
+      next_byte = ' ';  // In here because it's possible to get interrupted right before
+      break;
+      
+    case 'a':  // Rotate arm counter-clockwise
+      Serial.println('a');
       digitalWrite(ARM_DIR_PIN, HIGH);
       stepper_arm->move(steps_per_photo_around);
+      next_byte = ' ';  // Clear next_byte so we stop moving, or clear invalid input.
       break;
       
     case 'w':  // Slide camera up
       Serial.println('w');
       digitalWrite(LINE_DIR_PIN, HIGH);
       stepper_line->move(steps_per_level);
+      next_byte = ' ';  //  this statement if it's outside the switch statement, however unlikely.
       break;
       
     case 's':  // Slide camera down
       Serial.println('s');
       digitalWrite(LINE_DIR_PIN, LOW);
       stepper_line->move(steps_per_level);
+      next_byte = ' ';
       break;
 
     case 'e':  // Enable motors
       Serial.println('e');
       digitalWrite(ENA_PIN, LOW);
+      next_byte = ' ';
       moving = 0;
       break;
       
     case 'q':  // Disable motors
       Serial.println('q');
       digitalWrite(ENA_PIN, HIGH);
+      next_byte = ' ';
       moving = 0;
       break;
       
     default:
       Serial.print("Invalid input");
   }
-  next_byte = ' ';  // Clear next_byte so we stop moving, or clear invalid input.
-  prev_time = millis();
 }
 
 
@@ -252,11 +240,14 @@ void receiveEvent(int howMany) {
   if (howMany == 1) {
     // Receiving the usual wasd or qe
     next_byte = Wire.read();
+    Serial.print("Rec: ");
+    Serial.println(next_byte);
     moving = 1;
   }
   else {
     // Receiving two important setup integers (actually they're bytes, so we can't do more than
-    //  255? or 127? around or about, but that can be expanded some other time if necessary).
+    //  255? or 127? around or about, but that can be expanded some other time if necessary,
+    //  perhaps by bitshifting multiple bytes in).
     int dont_care = Wire.read();
     num_photos_per_rev = Wire.read();
     num_levels = Wire.read();
