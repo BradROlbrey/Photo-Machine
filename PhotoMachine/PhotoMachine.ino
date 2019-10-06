@@ -1,5 +1,7 @@
 #include <AccelStepper.h>
 
+AccelStepper *stepper;
+
 const byte MS1 = 0;
 const byte MS2 = 1;
 const byte MS3 = 2;
@@ -9,16 +11,20 @@ const byte DIR = 4;
 
 const int step_size = 16;   // 1/step_size is the actual step size, of course, but efficiency!
 const int steps_per_rev = 200 * step_size;
-const int num_photos = 5;  // Number of pictures to take all the way around the object.
-const double steps_per_photo = 1000;//steps_per_rev / num_photos;
+const int num_photos = 10;  // Number of pictures to take all the way around the object.
+const double steps_per_photo = 100; //steps_per_rev / num_photos;
   // (steps / rev) / (photos / rev) => (steps / photo)
-  // May not always divide cleanly, but want to make sure to go full 360 degree rotation!
+  // May not always divide cleanly, want to make sure to go full 360 degree rotation!
 
+long curr_time;
+long prev_time = micros();
 
 void setup() {
   Serial.begin(9600);
-  while (!Serial);  // Wait for the Serial monitor, apparently it's s/w instead of h/w?
-  Serial.println("Hello, World!");
+
+  stepper = new AccelStepper(step_forw, step_back);
+  stepper->setMaxSpeed(50);
+  stepper->setAcceleration(50);
   
   pinMode(MS1, OUTPUT);
   pinMode(MS2, OUTPUT);
@@ -28,70 +34,62 @@ void setup() {
   
   //full();
   //half();
-  //quarter();
+  quarter();
   //eighth();
-  sixteenth();
+  //sixteenth();
   
   digitalWrite(DIR, LOW);
   digitalWrite(STP, LOW);
 
-  //one_move();
-
+  while (!Serial);  // Wait for the Serial monitor, apparently it's s/w instead of h/w
+  Serial.println("Hello, World!");  // so it takes longer to initialize.
+  
   Serial.print("Steps per photo: ");
   Serial.println(steps_per_photo);
+
+  //one_move();
 }
+
+int my_personal_counter;
 
 void loop() {
   
-  int count = 0;
+  //int my_personal_counter = 0;
   while (true) {
     if (Serial.available()) {
+      my_personal_counter = 0;
       Serial.read();
-      Serial.print("\n\nMoving ");
+      //Serial.print("\n\nMoving ");
       one_move();
-    
-      Serial.println(++count);
+      Serial.println(my_personal_counter);
+      //Serial.println(++my_personal_counter);
+      delay(1000);
     }
   }
   
 }
 
-// one_move rotates the camera from one picture position to the next.
-// We want long delays to begin with to start slow, then short delays to move fast,
-//  then long delays to come to a smooth stop.
-// The delay_time (initialized in one_move()) will increase and decrease linearly
-//  to produce a(n angular) velocity with a constant rate of change,
-//  i.e. constant (angular) acceleration.
-const long max_delay = 10000;  // microseconds
-const int min_delay = 100;
-const int interval = ((max_delay - min_delay) / steps_per_photo) * 2;
-  // x2 because delay_time needs to go down AND up, twice the "distance".
-
 void one_move() {
+  stepper->move(steps_per_photo);
 
-  int steps = 0; 
-  int delay_time = max_delay;  // Start slow
-  
-  while (steps < steps_per_photo) {
-    
-    one_step();  // Take a single step.
-    ++steps;
-    Serial.print(steps);
-    Serial.print('\t');
-    delayMicroseconds(delay_time);
-
-    //Serial.print("Delay time: ");
-    Serial.println(delay_time);
-
-    if (steps < steps_per_photo/2)
-      delay_time -= interval;  // Make faster in first half
-    else
-      delay_time += interval;  // Make slower in second half
+  prev_time = micros();
+  while (stepper->distanceToGo() > 0) {
+    stepper->run();
   }
-  
 }
+  
+void step_forw() {
+  digitalWrite(DIR, LOW);
+  digitalWrite(STP, HIGH);
+  digitalWrite(STP, LOW);
+  ++my_personal_counter;
 
-void one_step() {
+  //curr_time = micros();
+  //Serial.println(curr_time - prev_time);
+  //prev_time = micros();
+}
+void step_back() {
+  digitalWrite(DIR, HIGH);
   digitalWrite(STP, HIGH);
   digitalWrite(STP, LOW);
 }
@@ -106,7 +104,7 @@ void half() {
   digitalWrite(MS2, LOW);
   digitalWrite(MS3, LOW);
 }
-void fourth() {
+void quarter() {
   digitalWrite(MS1, LOW);
   digitalWrite(MS2, HIGH);
   digitalWrite(MS3, LOW);
