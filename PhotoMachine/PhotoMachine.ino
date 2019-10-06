@@ -13,7 +13,7 @@
 #define R_SENSE 0.11f 
 TMC2208Stepper driver(SW_RX, SW_TX, R_SENSE);
 
-#define MICROSTEPS 0
+#define MICROSTEPS 1
 
 /*
  *  AccelStepper
@@ -21,8 +21,10 @@ TMC2208Stepper driver(SW_RX, SW_TX, R_SENSE);
 AccelStepper *stepper_arm;  // Need step_forw to be initialized first, so wait until setup().
 AccelStepper *stepper_line;
 
-#define ARM_DIR_PIN         5  // Direction
-#define ARM_STEP_PIN        6  // Step
+#define ENA_PIN             7  // For both motors
+
+#define ARM_DIR_PIN         5   // Direction
+#define ARM_STEP_PIN        6   // Step
 
 #define LINE_DIR_PIN        8
 #define LINE_STEP_PIN       9
@@ -33,7 +35,7 @@ AccelStepper *stepper_line;
  */
 const int STEPS_PER_REV_ARM = 200 * (MICROSTEPS+1);
 const int NUM_PHOTOS_ARM = 10;  // Number of pictures to take all the way around the object.
-const double STEPS_PER_PHOTO = 50; //25 * (MICROSTEPS+1); //STEPS_PER_REV_ARM / (double) NUM_PHOTOS_ARM;
+const double STEPS_PER_PHOTO = 25 * (MICROSTEPS+1); //STEPS_PER_REV_ARM / (double) NUM_PHOTOS_ARM;
   // (steps / rev) / (photos / rev) => (steps / photo)
   // May not always divide cleanly, want to make sure to go full 360 degree rotation!
 
@@ -54,7 +56,7 @@ void setup() {
   /*
    *  TMC2208 Driver
    */
-  driver.beginSerial(9600);     // SW UART drivers
+  driver.beginSerial(9600);       // SW UART drivers
 
   driver.begin();                 // SPI: Init CS pins and possible SW SPI pins
                                   // UART: Init SW UART (if selected) with default 115200 baudrate
@@ -76,6 +78,9 @@ void setup() {
   /*
    *  AccelStepper
    */
+  pinMode(ENA_PIN, OUTPUT);
+  digitalWrite(ENA_PIN, HIGH);  // HIGH is disabled
+  
   stepper_arm = new AccelStepper(step_arm, step_back_arm);
   stepper_arm->setMaxSpeed(10 * (MICROSTEPS+1));
   stepper_arm->setAcceleration(10 * (MICROSTEPS+1));
@@ -145,33 +150,45 @@ void loop() {
 
   switch (next_byte) {
     case ' ': break;
-    
-    case 'w':  // Slide camera up
-      Serial.println("w");
-      digitalWrite(LINE_DIR_PIN, HIGH);
-      stepper_line->move(STEPS_PER_PHOTO);
-      break;
-      
-    case 's':  // Slide camera down
-      Serial.println("s");
-      digitalWrite(LINE_DIR_PIN, LOW);
-      stepper_line->move(STEPS_PER_PHOTO);
-      break;
       
     case 'a':  // Rotate arm counter-clockwise
-      Serial.println("a");
+      Serial.println('a');
       digitalWrite(ARM_DIR_PIN, LOW);
       stepper_arm->move(STEPS_PER_PHOTO);
       break;
       
     case 'd':  // Rotate arm clockwise
-      Serial.println("d");
+      Serial.println('d');
       digitalWrite(ARM_DIR_PIN, HIGH);
       stepper_arm->move(STEPS_PER_PHOTO);
       break;
+      
+    case 'w':  // Slide camera up
+      Serial.println('w');
+      digitalWrite(LINE_DIR_PIN, HIGH);
+      stepper_line->move(STEPS_PER_PHOTO);
+      break;
+      
+    case 's':  // Slide camera down
+      Serial.println('s');
+      digitalWrite(LINE_DIR_PIN, LOW);
+      stepper_line->move(STEPS_PER_PHOTO);
+      break;
 
+    case 'e':  // Enable motors
+      Serial.println('e');
+      digitalWrite(ENA_PIN, LOW);
+      moving = 0;
+      break;
+      
+    case 'q':  // Disable motors
+      Serial.println('q');
+      digitalWrite(ENA_PIN, HIGH);
+      moving = 0;
+      break;
+      
     default:
-      Serial.print("Invalid input, wasd only plz");
+      Serial.print("Invalid input");
   }
   next_byte = ' ';  // Clear next_byte so we stop moving, or clear invalid input.
   prev_time = millis();
