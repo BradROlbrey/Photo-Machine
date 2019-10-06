@@ -9,10 +9,12 @@
 /*
  *  TMC2208 Driver
  */
-#define SW_RX  5  // SoftwareSerial receive pin
-#define SW_TX  4  // SoftwareSerial transmit pin
+#define SW_RX  11  // SoftwareSerial receive pin
+#define SW_TX  10  // SoftwareSerial transmit pin
 #define R_SENSE 0.11f 
 TMC2208Stepper driver(SW_RX, SW_TX, R_SENSE);
+
+#define MICROSTEPS 256
 
 /*
  *  AccelStepper
@@ -23,14 +25,13 @@ AccelStepper *stepper_arm;  // Need step_forw to be initialized first, so wait u
 /*
  *  Photo stuff
  */
-const int STEP_SIZE_ARM = 16;   // 1/step_size is the actual step size, of course, but efficiency!
-const int STEPS_PER_REV_ARM = 200 * STEP_SIZE_ARM;
+const int STEPS_PER_REV_ARM = 200 * (MICROSTEPS+1);
 const int NUM_PHOTOS_ARM = 10;  // Number of pictures to take all the way around the object.
-const double STEPS_PER_PHOTO = 10000; //STEPS_PER_REV_ARM / (double) NUM_PHOTOS_ARM;
+const double STEPS_PER_PHOTO = 25 * (MICROSTEPS+1); //STEPS_PER_REV_ARM / (double) NUM_PHOTOS_ARM;
   // (steps / rev) / (photos / rev) => (steps / photo)
   // May not always divide cleanly, want to make sure to go full 360 degree rotation!
 
-bool dir_arm = false;
+bool arm_dir = false;
 
 
 void setup() {
@@ -44,15 +45,15 @@ void setup() {
   driver.begin();                 // SPI: Init CS pins and possible SW SPI pins
                                   // UART: Init SW UART (if selected) with default 115200 baudrate
   driver.toff(5);                 // Enables driver in software
-  driver.microsteps(256);          // Set microsteps to 1/16th
+  driver.microsteps(MICROSTEPS);          // Set microsteps to 1/16th
 
   driver.rms_current(200);        // Set motor RMS current (done over UART >:)
   driver.I_scale_analog(1);
   driver.internal_Rsense(0);
-  //driver.intpol(0);
+  driver.intpol(0);
   driver.ihold(2);
   driver.irun(31);
-  //driver.iholddelay(15);
+  driver.iholddelay(15);
 
 //driver.en_spreadCycle(false);   // Toggle spreadCycle on TMC2208
   driver.pwm_autoscale(true);     // Needed for stealthChop
@@ -62,8 +63,8 @@ void setup() {
    *  AccelStepper
    */
   stepper_arm = new AccelStepper(step_arm, step_back_arm);
-  stepper_arm->setMaxSpeed(5000);
-  stepper_arm->setAcceleration(10000);
+  stepper_arm->setMaxSpeed(10 * (MICROSTEPS+1));
+  stepper_arm->setAcceleration(10 * (MICROSTEPS+1));
   
   
   pinMode(ARM_STEP_PIN, OUTPUT);
@@ -84,27 +85,48 @@ void setup() {
 int counter = 0;
 unsigned long prev_time;
 unsigned long curr_time;
+char next_byte;
 
 void loop() {
+  driver.microsteps(MICROSTEPS);  // Because I keep powering the driver after the arduino...
 
-  // TODO: WASD these serial reads
+  if (Serial.available()) {
+    next_byte = Serial.read();
+    Serial.read();
+    Serial.print("Moving\t");
+    Serial.print(next_byte);
 
-  while (true) {
-    if (Serial.available()) {
-      Serial.read();
-      //Serial.print("Moving ");
-      
-      one_move();
-      
-      //Serial.println(++counter);
+
+    switch (next_byte) {
+        
+      case 'a':  // Rotate arm counter-clockwise
+        Serial.print("\ta");
+        if (arm_dir) {
+          arm_dir = false;
+          digitalWrite(ARM_DIR_PIN, arm_dir);
+        }
+        break;
+      case 'd':  // Rotate arm clockwise
+        Serial.print("\td");
+        if (!arm_dir) {
+          arm_dir = true;
+          digitalWrite(ARM_DIR_PIN, arm_dir);
+        }
+        break;
+
+      default:
+        Serial.print("Invalid input, wasd only plz");
     }
+    one_move();
+    Serial.println();
+    
+    //Serial.println(++counter);
   }
   
 }
 
 
 void one_move() {
-  Serial.println("Moving ");
   stepper_arm->move(STEPS_PER_PHOTO);
   
   while (stepper_arm->distanceToGo() > 0) {
