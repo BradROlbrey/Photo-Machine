@@ -101,37 +101,43 @@ def main():
 	# We will start by going clockwise.
 	rotation_dir = 'd'
 	
-	# for each level
-	for i in range(num_levels):
-		# for each picture in the rotation
-		for j in range(num_photos_per_rev):
+	# Take pictures as we go up, return down, rotate, repeat.
+	# Returning down before rotating prevents the ribbon cable from bunching up and tangling
+	#	with other things.
+	# Also makes it much easier to return the camera to the start position.
+
+	# for each rotation
+	for i in range(num_photos_per_rev):
+		# for each level
+		for j in range(num_levels):
 
 			time = "{:0>2}h{:0>2}m{:0>2}s".format(datetime.now().time().hour, datetime.now().time().minute, datetime.now().time().second)
-			total_pics = i * num_photos_per_rev + j + 1
+			total_pics = i * num_levels + j + 1
 			name = 'test-{}_{:0>2}-{:0>2}_{:0>3}.jpg'.format(time, i+1, j+1, total_pics)
 			sleep(.5)
 			print("Taking picture", name)
 			camera.capture(name)
 			sleep(.5)
 			
-			if j != num_photos_per_rev-1:
-				scoot_camera(bus, ord(rotation_dir), arduino_addr)
+			# Scoot up as we take photos
+			# ord(str) gets the ascii value of str, so we can send the
+			#	input as an int over I2C.
+			if j != num_levels-1:
+				scoot_camera(bus, ord('w'), arduino_addr)
 			# else continue
 			# Need the, say, 5 photos. But only want 4 moves. So skip move on last loop.
 
-		# Move the camera up after a full rotation.
-		# ord(str) gets the ascii value of str, so we can send the
-		#	input as an int over I2C.
-		if i != num_levels-1:
-			scoot_camera(bus, ord('w'), arduino_addr)
+		# Return down all the way once we're done with this longitude
+		scoot_camera(bus, ord('s'), arduino_addr)
+
+		# Rotate the camera one move
+		if i != num_photos_per_rev-1:
+			scoot_camera(bus, ord('d'), arduino_addr)
 		# Need the, say, 3 levels. But only want 2 moves. So skip move on last loop.
-			
-		# Change the direction.
-		if rotation_dir == 'd':
-			rotation_dir = 'a'
-		elif rotation_dir == 'a':
-			rotation_dir = 'd'
 	
+	# Rotate the camera back to the beginning
+	scoot_camera(bus, ord('a'), arduino_addr)
+
 	print("Finished! Disabling motor drivers")
 	try:
 		bus.write_byte(arduino_addr, ord('q'))
@@ -146,33 +152,33 @@ def scoot_camera(bus, direction, arduino_addr):
 			bus.write_byte(arduino_addr, direction)
 		except OSError:
 			print("OSError: Failed to write to specified peripheral")
-		sleep(1)
+		sleep(.1)  # Give the Arduino some tiny breathing room to receive the input and
+		# set its status (int moving) before requesting it.
+		# Doesn't matter if it finished moving before this is done. Probably.
 		
 		arduino_status = 1
 		#print("Arduino_status:", arduino_status)
-		entered = False  # Keeps track of whether or not we've entered the wait loop.
-		while True:
+		# entered = False  # Keeps track of whether or not we've entered the wait loop.
+		while arduino_status:
 			try:
 				arduino_status = bus.read_byte(arduino_addr)
 			except OSError:
 				print("OSError: Failed to read from specified peripheral")
-				
-			if arduino_status == 0:
-				break
 			
 			#print("Waiting for Arduino to finish moving", arduino_status)
 			sleep(.5)  # Poll every half second.
 				
-			# We have to go into here at least once. 
-			entered = True
+			# # We have to go into here at least once. But it may not take a whole second for the arduino
+			# # to finish moving (after we write requestion move, changed recently).
+			# entered = True
 				
-		#print("Arduino_status:", arduino_status)
-		if entered:
-			entered = False
-		else:
-			print("Dun dern still #@(%ing up >:\\\n"
-				  "Or it simply finished moving too fast because you went from 0 to 256 microsteps without changing the amount of steps it needs to take.")
-			exit(1)
+		# #print("Arduino_status:", arduino_status)
+		# if entered:
+		# 	entered = False
+		# else:
+		# 	print("Dun dern still #@(%ing up >:\\\n"
+		# 		  "Or it simply finished moving too fast because you went from 0 to 256 microsteps without changing the amount of steps it needs to take.")
+		# 	exit(1)
 	
 
 if __name__ == '__main__':

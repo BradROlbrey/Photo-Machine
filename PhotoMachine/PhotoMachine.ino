@@ -99,8 +99,8 @@ void setup() {
   digitalWrite(ARM_DIR_PIN, LOW);
   
   stepper_line = new AccelStepper(step_line, step_back_line);
-  stepper_line->setMaxSpeed(120L * MICROSTEPS);
-  stepper_line->setAcceleration(80L * MICROSTEPS);
+  stepper_line->setMaxSpeed(2000L * MICROSTEPS);
+  stepper_line->setAcceleration(1000L * MICROSTEPS);
   
   pinMode(LINE_STEP_PIN, OUTPUT);
   digitalWrite(LINE_STEP_PIN, LOW);
@@ -118,8 +118,8 @@ void setup() {
   /*
    *  Serial
    */
-  while (!Serial);  // Wait for the Serial monitor, apparently it's s/w instead of h/w
-  Serial.println("Hello, World!");  // so it takes longer to initialize.
+  //while (!Serial);  // Wait for the Serial monitor, apparently it's s/w instead of h/w
+  //Serial.println("Hello, World!");  // so it takes longer to initialize.
 
   /*
    *  Photo stuff
@@ -157,8 +157,8 @@ void loop() {
   driver.microsteps(MICROSTEPS);  // Because I keep powering the drivers after the arduino...
   
   prev_time = millis() - print_interval;
-  while (stepper_arm->distanceToGo() > 0 ||
-        stepper_line->distanceToGo() > 0
+  while (stepper_line->distanceToGo() > 0 || 
+         stepper_arm->distanceToGo() > 0
     ) {
     // We check distToGo instead of moving so the switch statement is guaranteed to run first.
     // Otherwise we could end up in here, set moving = 0, and get mad.
@@ -175,13 +175,13 @@ void loop() {
       moving = 0;
     }
 
-    if (millis() - prev_time > print_interval) {
+    /*if (millis() - prev_time > print_interval) {
       Serial.print("\tStepper line:  ");
       Serial.print(stepper_line->distanceToGo());
       Serial.print("\tStepper arm:  ");
       Serial.println(stepper_arm->distanceToGo());
       prev_time += print_interval;
-    }
+    }*/
   }
 
   switch (next_byte) {
@@ -197,7 +197,7 @@ void loop() {
     case 'a':  // Rotate arm counter-clockwise
       Serial.println('a');
       digitalWrite(ARM_DIR_PIN, HIGH);
-      stepper_arm->move(steps_per_photo_around);
+      stepper_arm->move(steps_per_photo_around * (num_photos_per_rev - 1));
       next_byte = ' ';  // Clear next_byte so we stop moving, or clear invalid input.
       break;
       
@@ -211,7 +211,7 @@ void loop() {
     case 's':  // Slide camera down
       Serial.println('s');
       digitalWrite(LINE_DIR_PIN, LOW);
-      stepper_line->move(steps_per_level);
+      stepper_line->move(steps_per_level * (num_levels - 1));
       next_byte = ' ';
       break;
 
