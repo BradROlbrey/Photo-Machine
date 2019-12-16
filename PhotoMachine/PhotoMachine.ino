@@ -75,7 +75,7 @@ void setup() {
   driver.I_scale_analog(1);
   driver.internal_Rsense(0);
   //driver.intpol(0);
-  driver.ihold(2);
+  driver.ihold(31);
   driver.irun(31);
   driver.iholddelay(15);
 
@@ -125,7 +125,7 @@ void setup() {
    *  Photo stuff
    */
   const long TOTAL_STEPS_AROUND = 200L * MICROSTEPS;
-  const long TOTAL_STEPS_UP = 350L * MICROSTEPS;
+  const long TOTAL_STEPS_UP = 300L * MICROSTEPS;
   
   print_interval = 5000;
   prev_time = millis() - print_interval;
@@ -141,7 +141,7 @@ void setup() {
   Serial.println();
   
   steps_per_photo_around = TOTAL_STEPS_AROUND / num_photos_per_rev;
-  steps_per_level = TOTAL_STEPS_UP / num_levels;
+  steps_per_level = TOTAL_STEPS_UP / (num_levels - 1);
   
   Serial.print("Pictures per rotation: ");
   Serial.println(num_photos_per_rev);

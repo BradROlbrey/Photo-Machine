@@ -5,9 +5,16 @@
 from sys import exit
 import smbus
 from time import sleep
+from picamera import PiCamera
+from datetime import datetime
 		
 		
 def main():
+
+	camera = PiCamera()
+	camera.resolution = (3280, 2464)
+	camera.vflip = True
+	camera.start_preview()
 
 	# Initialize I2C (SMBus)
 	bus = smbus.SMBus(1)
@@ -98,8 +105,14 @@ def main():
 	for i in range(num_levels):
 		# for each picture in the rotation
 		for j in range(num_photos_per_rev):
-			print("Taking picture")
-			sleep(1)  # Take a picture
+
+			time = "{:0>2}h{:0>2}m{:0>2}s".format(datetime.now().time().hour, datetime.now().time().minute, datetime.now().time().second)
+			total_pics = i * num_photos_per_rev + j + 1
+			name = 'test-{}_{:0>2}-{:0>2}_{:0>3}.jpg'.format(time, i+1, j+1, total_pics)
+			sleep(.5)
+			print("Taking picture", name)
+			camera.capture(name)
+			sleep(.5)
 			
 			if j != num_photos_per_rev-1:
 				scoot_camera(bus, ord(rotation_dir), arduino_addr)
@@ -128,7 +141,7 @@ def main():
 
 def scoot_camera(bus, direction, arduino_addr):
 		
-		print("Requesting move")
+		#print("Requesting move")
 		try:
 			bus.write_byte(arduino_addr, direction)
 		except OSError:
@@ -147,13 +160,13 @@ def scoot_camera(bus, direction, arduino_addr):
 			if arduino_status == 0:
 				break
 			
-			print("Waiting for Arduino to finish moving", arduino_status)
+			#print("Waiting for Arduino to finish moving", arduino_status)
 			sleep(.5)  # Poll every half second.
 				
 			# We have to go into here at least once. 
 			entered = True
 				
-		print("Arduino_status:", arduino_status)
+		#print("Arduino_status:", arduino_status)
 		if entered:
 			entered = False
 		else:
