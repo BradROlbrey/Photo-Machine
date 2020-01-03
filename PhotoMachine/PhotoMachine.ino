@@ -70,7 +70,7 @@ void setup() {
   driver.begin();                 // SPI: Init CS pins and possible SW SPI pins
                                   // UART: Init SW UART (if selected) with default 115200 baudrate
   driver.toff(5);                 // Enables driver in software
-  driver.microsteps(MICROSTEPS);          // Set microsteps to 1/16th
+  driver.microsteps(MICROSTEPS);  // Set microsteps to whatever
 
   driver.I_scale_analog(1);
   driver.internal_Rsense(0);
@@ -99,8 +99,8 @@ void setup() {
   digitalWrite(ARM_DIR_PIN, LOW);
   
   stepper_line = new AccelStepper(step_line, step_back_line);
-  stepper_line->setMaxSpeed(2000L * MICROSTEPS);
-  stepper_line->setAcceleration(1000L * MICROSTEPS);
+  stepper_line->setMaxSpeed(100L * MICROSTEPS);
+  stepper_line->setAcceleration(100L * MICROSTEPS);
   
   pinMode(LINE_STEP_PIN, OUTPUT);
   digitalWrite(LINE_STEP_PIN, LOW);
@@ -155,34 +155,6 @@ void setup() {
 
 void loop() {
   driver.microsteps(MICROSTEPS);  // Because I keep powering the drivers after the arduino...
-  
-  prev_time = millis() - print_interval;
-  while (stepper_line->distanceToGo() > 0 || 
-         stepper_arm->distanceToGo() > 0
-    ) {
-    // We check distToGo instead of moving so the switch statement is guaranteed to run first.
-    // Otherwise we could end up in here, set moving = 0, and get mad.
-  
-    stepper_arm->run();
-    stepper_line->run();
-
-    // May need to wrap this in THE protective statement to protect moving?
-    // But moving is volatile and one byte, so no problem there.
-    // Others are probably ints, but not in an ISR. Hmm...
-    if (stepper_arm->distanceToGo() == 0 &&
-        stepper_line->distanceToGo() == 0
-      ) {
-      moving = 0;
-    }
-
-    /*if (millis() - prev_time > print_interval) {
-      Serial.print("\tStepper line:  ");
-      Serial.print(stepper_line->distanceToGo());
-      Serial.print("\tStepper arm:  ");
-      Serial.println(stepper_arm->distanceToGo());
-      prev_time += print_interval;
-    }*/
-  }
 
   switch (next_byte) {
     case ' ': break;
@@ -191,27 +163,35 @@ void loop() {
       Serial.println('d');
       digitalWrite(ARM_DIR_PIN, LOW);
       stepper_arm->move(steps_per_photo_around);
-      next_byte = ' ';  // In here because it's possible to get interrupted right before
+      stepper_arm->runToPosition();  // Blocks here until motor fully moved.
+      moving = 0;
+      next_byte = ' ';  // Clear next_byte so we stop moving, or clear invalid input.
       break;
       
     case 'a':  // Rotate arm counter-clockwise
       Serial.println('a');
       digitalWrite(ARM_DIR_PIN, HIGH);
       stepper_arm->move(steps_per_photo_around * (num_photos_per_rev - 1));
-      next_byte = ' ';  // Clear next_byte so we stop moving, or clear invalid input.
+      stepper_arm->runToPosition();
+      moving = 0;
+      next_byte = ' ';  // In here because it's possible to get interrupted right before.
       break;
       
     case 'w':  // Slide camera up
       Serial.println('w');
       digitalWrite(LINE_DIR_PIN, HIGH);
       stepper_line->move(steps_per_level);
-      next_byte = ' ';  //  this statement if it's outside the switch statement, however unlikely.
+      stepper_line->runToPosition();
+      moving = 0;
+      next_byte = ' ';  // this statement if it's outside the switch statement, however unlikely.
       break;
       
     case 's':  // Slide camera down
       Serial.println('s');
       digitalWrite(LINE_DIR_PIN, LOW);
       stepper_line->move(steps_per_level * (num_levels - 1));
+      stepper_line->runToPosition();
+      moving = 0;
       next_byte = ' ';
       break;
 
