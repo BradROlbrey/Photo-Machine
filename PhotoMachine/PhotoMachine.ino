@@ -157,13 +157,6 @@ void loop() {
   switch (next_byte) {
     case ' ': break;
       
-    case 'd':  // Rotate arm clockwise
-      Serial.println('d');
-      digitalWrite(ARM_DIR_PIN, LOW);
-      stepper_arm->move(steps_per_photo_around);
-      stepper_arm->runToPosition();  // Blocks here until motor fully moved.
-      break;
-      
     case 'w':  // Slide camera up
       Serial.println('w');
       digitalWrite(LINE_DIR_PIN, HIGH);
@@ -171,18 +164,25 @@ void loop() {
       stepper_line->runToPosition();
       break;
       
-    case 'a':  // Rotate arm counter-clockwise
-      Serial.println('a');
-      digitalWrite(ARM_DIR_PIN, HIGH);
-      stepper_arm->move(steps_per_photo_around * (num_photos_per_rev - 1));
-      stepper_arm->runToPosition();
+    case 'd':  // Rotate arm clockwise
+      Serial.println('d');
+      digitalWrite(ARM_DIR_PIN, LOW);
+      stepper_arm->move(steps_per_photo_around);
+      stepper_arm->runToPosition();  // Blocks here until motor fully moved.
       break;
       
-    case 's':  // Slide camera down
+    case 's':  // Slide camera down to bottom
       Serial.println('s');
       digitalWrite(LINE_DIR_PIN, LOW);
-      stepper_line->move(steps_per_level * (num_levels - 1));
+      stepper_line->moveTo(0);  // absolute
       stepper_line->runToPosition();
+      break;
+      
+    case 'a':  // Rotate arm all the way counter-clockwise (returns to start position)
+      Serial.println('a');
+      digitalWrite(ARM_DIR_PIN, HIGH);
+      stepper_arm->moveTo(0);  // absolute
+      stepper_arm->runToPosition();
       break;
 
     case 'e':  // Enable motors
@@ -216,7 +216,7 @@ void receiveEvent(int howMany) {
     // Receiving two important setup integers (actually they're bytes, so we can't do more than
     //  255? or 127? around or about, but that can be expanded some other time if necessary,
     //  perhaps by bitshifting multiple bytes in).
-    int dont_care = Wire.read();
+    int dont_care = Wire.read();  // Could be useful in the future as a code or something.
     // Don't think these need to be volatile b/c they're inside the interrupt.
     int num_photos_per_rev = Wire.read();  // Number of pictures to take all the way around the object.
     int num_levels = Wire.read();  // Number of rotations to make, number of times camera moves up.
