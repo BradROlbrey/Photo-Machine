@@ -17,6 +17,10 @@ TMC2208Stepper driver(SW_RX, SW_TX, R_SENSE);
 
 #define MICROSTEPS 256L  // Don't do zero; I changed the library with the first program that has this comment.
 
+// Don't think these need to be volatile because they're read-only.
+const long TOTAL_STEPS_AROUND = 200L * MICROSTEPS;
+const long TOTAL_STEPS_UP = 300L * MICROSTEPS;
+
 /*
  *  AccelStepper
  */
@@ -35,15 +39,12 @@ AccelStepper *stepper_line;
 /*
  *  Photo stuff
  */
-// Don't think these need to be volatile, but just in case.
-volatile int num_photos_per_rev = NULL;  // Number of pictures to take all the way around the object.
-volatile int num_levels = NULL;  // Number of rotations to make, number of times camera moves up.
-  
-long steps_per_photo_around;  // To be assigned after receiving photos per rotation
+// Don't think these need to be volatile, but just in case because they are written in I2C interrupts.
+volatile long steps_per_photo_around = NULL;  // To be assigned after receiving photos per rotation
   // (steps / rev) / (photos / rev) => (steps / photo)
   // May not always divide cleanly, but it's good enough with our epic microstepping, and we'll
   //  be switching direction anyways, so not going to do type double for now.
-long steps_per_level;
+volatile long steps_per_level = NULL;
 
 bool arm_dir = false;
 bool line_dir = false;
@@ -126,11 +127,10 @@ void setup() {
   /*
    *  Photo stuff
    */
-  const long TOTAL_STEPS_AROUND = 200L * MICROSTEPS;
-  const long TOTAL_STEPS_UP = 300L * MICROSTEPS;
   
   print_interval = 5000;
   prev_time = millis() - print_interval;
+  // Wait to receive over I2C
   while (num_photos_per_rev == NULL ||
          num_levels == NULL) {
     if (millis() - prev_time > print_interval) {
@@ -139,11 +139,7 @@ void setup() {
     }
   }
   print_interval = 250;
-  
   Serial.println();
-  
-  steps_per_photo_around = TOTAL_STEPS_AROUND / num_photos_per_rev;
-  steps_per_level = TOTAL_STEPS_UP / (num_levels - 1);
   
   Serial.print("Pictures per rotation: ");
   Serial.println(num_photos_per_rev);
@@ -221,8 +217,12 @@ void receiveEvent(int howMany) {
     //  255? or 127? around or about, but that can be expanded some other time if necessary,
     //  perhaps by bitshifting multiple bytes in).
     int dont_care = Wire.read();
-    num_photos_per_rev = Wire.read();
-    num_levels = Wire.read();
+    // Don't think these need to be volatile b/c they're inside the interrupt.
+    int num_photos_per_rev = Wire.read();  // Number of pictures to take all the way around the object.
+    int num_levels = Wire.read();  // Number of rotations to make, number of times camera moves up.
+  
+    steps_per_photo_around = TOTAL_STEPS_AROUND / num_photos_per_rev;
+    steps_per_level = TOTAL_STEPS_UP / (num_levels - 1);
   }
 }
 // Send data to Pi
