@@ -28,16 +28,9 @@ def main():
 	# Disable the motors so we can manually manipulate the machine.
 	print("Disabling motors")
 	try:
-		bus.write_byte(arduino_addr, ord('q'))
-		sleep(.1)
-		bus.write_byte(arduino_addr, ord('q'))
-		sleep(.1)
-		bus.write_byte(arduino_addr, ord('q'))
-		sleep(.1)
-		bus.write_byte(arduino_addr, ord('q'))
-		sleep(.1)
-		bus.write_byte(arduino_addr, ord('q'))
-		sleep(.1)
+		for i in range(5):
+			bus.write_byte(arduino_addr, ord('q'))
+			sleep(.1)
 			# For some reason, sending first 'q' is unreliable. Delay does not fix,
 			#	so sending multiple q's with small delays.
 			# Oddly enough, the Arduino's receive function recognizes the 'q', but
@@ -48,7 +41,7 @@ def main():
 		print("OSError: Failed to disable motor drivers")
 		exit(1)
 	
-	print("Make sure the Arm is rotated such that the motor wires won't twist and Slider is at bottom-most position")
+	print("Make sure the Arm is rotated such that the motor wires twist properly and Slider is at bottom-most position")
 	
 	
 	'''
@@ -84,7 +77,7 @@ def main():
 	'''
 		Enable motors
 	'''
-	# Re-enable Arduino when this is done.
+	# Re-enable stepper drivers when this is done.
 	print("Enabling motors")
 	try:
 		bus.write_byte(arduino_addr, ord('e'))  # 'e' for enable motors!
@@ -97,9 +90,6 @@ def main():
 	'''
 		Picture loop
 	'''
-	# We assume we start at the bottom, and only need to go up.
-	# We will start by going clockwise.
-	rotation_dir = 'd'
 	
 	# Take pictures as we go up, return down, rotate, repeat.
 	# Returning down before rotating prevents the ribbon cable from bunching up and tangling
@@ -111,7 +101,11 @@ def main():
 		# for each level
 		for j in range(num_levels):
 
-			time = "{:0>2}h{:0>2}m{:0>2}s".format(datetime.now().time().hour, datetime.now().time().minute, datetime.now().time().second)
+			time = "{:0>2}h{:0>2}m{:0>2}s".format(
+				datetime.now().time().hour,
+				datetime.now().time().minute,
+				datetime.now().time().second
+			)
 			total_pics = i * num_levels + j + 1
 			name = 'test-{}_{:0>2}-{:0>2}_{:0>3}.jpg'.format(time, i+1, j+1, total_pics)
 			sleep(.5)
@@ -158,7 +152,6 @@ def scoot_camera(bus, direction, arduino_addr):
 		
 		arduino_status = 1
 		#print("Arduino_status:", arduino_status)
-		# entered = False  # Keeps track of whether or not we've entered the wait loop.
 		while arduino_status:
 			try:
 				arduino_status = bus.read_byte(arduino_addr)
@@ -167,18 +160,6 @@ def scoot_camera(bus, direction, arduino_addr):
 			
 			#print("Waiting for Arduino to finish moving", arduino_status)
 			sleep(.5)  # Poll every half second.
-				
-			# # We have to go into here at least once. But it may not take a whole second for the arduino
-			# # to finish moving (after we write requestion move, changed recently).
-			# entered = True
-				
-		# #print("Arduino_status:", arduino_status)
-		# if entered:
-		# 	entered = False
-		# else:
-		# 	print("Dun dern still #@(%ing up >:\\\n"
-		# 		  "Or it simply finished moving too fast because you went from 0 to 256 microsteps without changing the amount of steps it needs to take.")
-		# 	exit(1)
 	
 
 if __name__ == '__main__':
