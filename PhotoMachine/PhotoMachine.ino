@@ -12,13 +12,15 @@
 #define SW_TX  11  // SoftwareSerial transmit pin
 #define R_SENSE 0.11f 
 TMC2208Stepper driver(SW_RX, SW_TX, R_SENSE);
+// Seeing as how I pass those in as parameters, I could probably control two different drivers
+// easily enough by just having two instances, esp since it's software serial.
 
 #define MICROSTEPS 256L  // Don't do zero; I changed the library with the first program that has this comment.
 
 /*
  *  AccelStepper
  */
-AccelStepper *stepper_arm;  // Need step_forw to be initialized first, so wait until setup().
+AccelStepper *stepper_arm;  // Need step_forw to be initialized first, so wait until setup() to instantiate an instance.
 AccelStepper *stepper_line;
 
 #define ENA_PIN             7  // For both motors
@@ -164,17 +166,6 @@ void loop() {
       digitalWrite(ARM_DIR_PIN, LOW);
       stepper_arm->move(steps_per_photo_around);
       stepper_arm->runToPosition();  // Blocks here until motor fully moved.
-      moving = 0;
-      next_byte = ' ';  // Clear next_byte so we stop moving, or clear invalid input.
-      break;
-      
-    case 'a':  // Rotate arm counter-clockwise
-      Serial.println('a');
-      digitalWrite(ARM_DIR_PIN, HIGH);
-      stepper_arm->move(steps_per_photo_around * (num_photos_per_rev - 1));
-      stepper_arm->runToPosition();
-      moving = 0;
-      next_byte = ' ';  // In here because it's possible to get interrupted right before.
       break;
       
     case 'w':  // Slide camera up
@@ -182,8 +173,13 @@ void loop() {
       digitalWrite(LINE_DIR_PIN, HIGH);
       stepper_line->move(steps_per_level);
       stepper_line->runToPosition();
-      moving = 0;
-      next_byte = ' ';  // this statement if it's outside the switch statement, however unlikely.
+      break;
+      
+    case 'a':  // Rotate arm counter-clockwise
+      Serial.println('a');
+      digitalWrite(ARM_DIR_PIN, HIGH);
+      stepper_arm->move(steps_per_photo_around * (num_photos_per_rev - 1));
+      stepper_arm->runToPosition();
       break;
       
     case 's':  // Slide camera down
@@ -191,27 +187,23 @@ void loop() {
       digitalWrite(LINE_DIR_PIN, LOW);
       stepper_line->move(steps_per_level * (num_levels - 1));
       stepper_line->runToPosition();
-      moving = 0;
-      next_byte = ' ';
       break;
 
     case 'e':  // Enable motors
       Serial.println('e');
       digitalWrite(ENA_PIN, LOW);
-      next_byte = ' ';
-      moving = 0;
       break;
       
     case 'q':  // Disable motors
       Serial.println('q');
       digitalWrite(ENA_PIN, HIGH);
-      next_byte = ' ';
-      moving = 0;
       break;
       
     default:
       Serial.print("Invalid input");
   }
+  next_byte = ' ';  // Clear next_byte so we stop moving, or clear invalid input.
+  moving = 0;       // Won't get interrupted as long as moving = 1.
 }
 
 
