@@ -19,7 +19,7 @@ def main():
 	# Initialize I2C (SMBus)
 	bus = smbus.SMBus(1)
 	arduino_addr = 0x7f
-	arduino_status = 1  # Make us wait, by default.
+	moving = 1  # Make us wait, by default.
 	
 	
 	'''
@@ -108,6 +108,8 @@ def main():
 			)
 			total_pics = i * num_levels + j + 1
 			name = 'test-{}_{:0>2}-{:0>2}_{:0>3}.jpg'.format(time, i+1, j+1, total_pics)
+
+			wait_for_moving(bus, arduino_addr)
 			sleep(.5)
 			print("Taking picture", name)
 			camera.capture(name)
@@ -121,46 +123,62 @@ def main():
 			# else continue
 			# Need the, say, 5 photos. But only want 4 moves. So skip move on last loop.
 
-		# Return down all the way once we're done with this longitude
-		scoot_camera(bus, ord('s'), arduino_addr)
-
-		# Rotate the camera one move
+		# Return down all the way once we're done with this longitude and rotate camera one move.
+		# Need the, say, 3 levels. But only want 2 move rotations. So skip rotation on last loop.
+		# Will handle last move down outside of loop.
 		if i != num_photos_per_rev-1:
+			scoot_camera(bus, ord('s'), arduino_addr)
+			wait_for_processing(bus, arduino_addr)
 			scoot_camera(bus, ord('d'), arduino_addr)
-		# Need the, say, 3 levels. But only want 2 moves. So skip move on last loop.
 	
-	# Rotate the camera back to the beginning
+	# Rotate the camera back to the beginning and return down all the way.
+	scoot_camera(bus, ord('s'), arduino_addr)
+	wait_for_processing(bus, arduino_addr)
 	scoot_camera(bus, ord('a'), arduino_addr)
+	wait_for_moving(bus, arduino_addr)
 
 	print("Finished! Disabling motor drivers")
 	try:
 		bus.write_byte(arduino_addr, ord('q'))
 	except OSError:
-		print("OSError: Failed disable motor drivers")
+		print("OSError: Failed to disable motor drivers")
 		
 
 def scoot_camera(bus, direction, arduino_addr):
-		
-		#print("Requesting move")
-		try:
-			bus.write_byte(arduino_addr, direction)
-		except OSError:
-			print("OSError: Failed to write to specified peripheral")
-		sleep(.1)  # Give the Arduino some tiny breathing room to receive the input and
-		# set its status (int moving) before requesting it.
-		# Doesn't matter if it finished moving before this is done. Probably.
-		
-		arduino_status = 1
-		#print("Arduino_status:", arduino_status)
-		while arduino_status:
-			try:
-				arduino_status = bus.read_byte(arduino_addr)
-			except OSError:
-				print("OSError: Failed to read from specified peripheral")
-			
-			#print("Waiting for Arduino to finish moving", arduino_status)
-			sleep(.5)  # Poll every half second.
+	#print("Requesting move")
+	try:
+		bus.write_byte(arduino_addr, direction)
+	except OSError:
+		print("OSError: Failed to write to specified peripheral")
+	sleep(.1)  # Give the Arduino some tiny breathing room to receive the input and
+	# set its status (int moving) before requesting it.
+	# Doesn't matter if it finished moving before this is done. Probably.
+
 	
+def wait_for_moving(bus, arduino_addr):
+	while True:
+		moving = read_bytes_from_arduino(bus, arduino_addr)[0]
+		if not moving:
+			return
+		#print("Waiting for Arduino to finish moving", arduino_status)
+		sleep(.5)
+		
+def wait_for_processing(bus, arduino_addr):
+	while True:
+		processing = read_bytes_from_arduino(bus, arduino_addr)[1]
+		if not processing:
+			return
+		sleep(.1)
+
+def read_bytes_from_arduino(bus, arduino_addr):
+	buffer = None
+	while True:
+		try:
+			buffer = bus.read_i2c_block_data(arduino_addr, 0, 2)
+			return buffer
+		except OSError:
+			print("OSError: Failed to read from specified peripheral")
+
 
 if __name__ == '__main__':
 	main()

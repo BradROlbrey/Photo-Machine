@@ -53,7 +53,9 @@ bool line_dir = false;
  *  I2C
  */
 volatile char next_byte = ' ';  // Stores the value from Wire.read().
-volatile byte moving = 0;
+volatile byte moving = 0;       // Tells the Pi whether the camera is still moving. Pi will wait
+                                // until camera stops before taking a picture.
+volatile byte processing = 0;   // Tells the Pi when the Arduino is 
 
 /*
  *  Serial.printing
@@ -78,7 +80,7 @@ void setup() {
   driver.I_scale_analog(1);
   driver.internal_Rsense(0);
   //driver.intpol(0);
-  driver.ihold(31);
+  driver.ihold(2);
   driver.irun(31);
   driver.iholddelay(15);
 
@@ -152,54 +154,73 @@ void setup() {
 }
 
 void loop() {
-  driver.microsteps(MICROSTEPS);  // Because I keep powering the drivers after the arduino...
+  stepper_arm->run();
+  stepper_line->run();
 
+  if (stepper_arm->distanceToGo() == 0 &&
+      stepper_line->distanceToGo() == 0)
+    {
+    moving = 0;
+  }
+
+  bool executed = false;
   switch (next_byte) {
-    case ' ': break;
+    case ' ':
+      executed = true;
+      break;
       
     case 'w':  // Slide camera up
+      executed = true;  // As soon as we've entered switch statement,
       Serial.println('w');
       digitalWrite(LINE_DIR_PIN, HIGH);
       stepper_line->move(steps_per_level);
-      stepper_line->runToPosition();
       break;
       
     case 'd':  // Rotate arm clockwise
+      executed = true;  // set true so Pi can immediately send more data.
       Serial.println('d');
       digitalWrite(ARM_DIR_PIN, LOW);
       stepper_arm->move(steps_per_photo_around);
-      stepper_arm->runToPosition();  // Blocks here until motor fully moved.
       break;
       
     case 's':  // Slide camera down to bottom
       Serial.println('s');
       digitalWrite(LINE_DIR_PIN, LOW);
       stepper_line->moveTo(0);  // absolute
-      stepper_line->runToPosition();
+      executed = true;
       break;
       
     case 'a':  // Rotate arm all the way counter-clockwise (returns to start position)
       Serial.println('a');
       digitalWrite(ARM_DIR_PIN, HIGH);
       stepper_arm->moveTo(0);  // absolute
-      stepper_arm->runToPosition();
+      executed = true;
       break;
 
     case 'e':  // Enable motors
       Serial.println('e');
       digitalWrite(ENA_PIN, LOW);
+      executed = true;
       break;
       
     case 'q':  // Disable motors
       Serial.println('q');
       digitalWrite(ENA_PIN, HIGH);
+      executed = true;
       break;
       
     default:
       Serial.print("Invalid input");
+      executed = true;
   }
-  next_byte = ' ';  // Clear next_byte so we stop moving, or clear invalid input.
-  moving = 0;       // Won't get interrupted as long as moving = 1.
+  if (executed) {
+    next_byte = ' ';
+    processing = 0;  // We have processed the Pi's input.
+
+  }
+  // Don't need to reset executed because it is initialized to false each loop.
+  // Receiving bytes needs to be blocking in case the Pi sends two bytes in quick
+  // succession before we get around to processing the first. This could happen anywhere!
 }
 
 
@@ -210,6 +231,8 @@ void receiveEvent(int howMany) {
     next_byte = Wire.read();
     Serial.print("Rec: ");
     Serial.println(next_byte);
+
+    processing = 1;
     moving = 1;
   }
   else {
@@ -228,7 +251,8 @@ void receiveEvent(int howMany) {
 // Send data to Pi
 void requestEvent() {
   delayMicroseconds(8);
-  Wire.write(moving);
+  byte temp = [moving, processing];
+  Wire.write(temp);
 }
 
 
