@@ -135,10 +135,12 @@ def main():
 		# Will handle last move down outside of loop.
 		if i != num_photos_per_rev-1:
 			write_byte(ord('s'))
+			wait_for_moving()
 			write_byte(ord('d'))
 	
 	# Rotate the camera back to the beginning and return down all the way.
 	write_byte(ord('s'))
+	wait_for_moving()
 	write_byte(ord('a'))
 	wait_for_moving()
 
@@ -199,7 +201,7 @@ def wait_for_processing():
 
 def read_bytes_from_arduino(which_byte):
 	buffer = None
-	for i in range(10):  # Try 10 times, if it doesn't work, exit.
+	for _ in range(10):  # Try 10 times, if it doesn't work, exit.
 		try:
 			buffer = bus.read_i2c_block_data(arduino_addr, which_byte, 2)
 			return buffer

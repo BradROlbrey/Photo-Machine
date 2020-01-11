@@ -21,7 +21,8 @@ TMC2208Stepper driver_arm(arm_SW_RX, arm_SW_TX, R_SENSE);
 #define line_SW_RX 12
 #define line_SW_TX 11
 TMC2208Stepper driver_line(line_SW_RX, line_SW_TX, R_SENSE);
-#define line_MICROSTEPS 16L
+#define line_MICROSTEPS 16L   // Nice balance between speed (ultimately limited by accelstepper or something) and
+                              // resolution (total steps up, divided by number of pictures, steps per pic!).
 
 
 // Don't think these need to be volatile because they're read-only.
@@ -81,41 +82,42 @@ void setup() {
    *  TMC2208 Driver
    */
   // ARM
-  driver_arm.beginSerial(9600);       // SW UART drivers
+  driver_arm.beginSerial(9600);           // SW UART drivers
 
-  driver_arm.begin();                 // SPI: Init CS pins and possible SW SPI pins
-                                      // UART: Init SW UART (if selected) with default 115200 baudrate
-  driver_arm.toff(5);                 // Enables driver in software
+  driver_arm.begin();                     // SPI: Init CS pins and possible SW SPI pins
+                                          // UART: Init SW UART (if selected) with default 115200 baudrate
+  driver_arm.toff(5);                     // Enables driver in software
   driver_arm.microsteps(arm_MICROSTEPS);  // Set microsteps to whatever
 
   driver_arm.I_scale_analog(1);
   driver_arm.internal_Rsense(0);
-  //driver.intpol(0);
-  driver_arm.ihold(1);
-  driver_arm.irun(31);
-  driver_arm.iholddelay(1);
+  driver_arm.intpol(1);                   // Interpolation of steps coarser than 256 microsteps
+  driver_arm.ihold(1);                    // Current draw when holding a position
+  driver_arm.irun(31);                    // Current draw when moving
+  //driver_arm.TPOWERDOWN(2);               // Delay time from stand still detection to motor current power down
+  //driver_arm.iholddelay(2);               // Time span during which current is decreased from irun to ihold
 
-  //driver.en_spreadCycle(false);     // Toggle spreadCycle on TMC2208
-  driver_arm.pwm_autoscale(true);     // Needed for stealthChop
+  //driver.en_spreadCycle(false);         // Toggle spreadCycle on TMC2208
+  driver_arm.pwm_autoscale(true);         // Needed for stealthChop
 
   
   // LINE
-  driver_line.beginSerial(9600);       // SW UART drivers
+  driver_line.beginSerial(9600);
 
-  driver_line.begin();                 // SPI: Init CS pins and possible SW SPI pins
-                                       // UART: Init SW UART (if selected) with default 115200 baudrate
-  driver_line.toff(5);                 // Enables driver in software
-  driver_line.microsteps(line_MICROSTEPS);  // Set microsteps to whatever
+  driver_line.begin();
+  driver_line.toff(5);
+  driver_line.microsteps(line_MICROSTEPS);
 
   driver_line.I_scale_analog(1);
   driver_line.internal_Rsense(0);
-  //driver.intpol(0);
+  driver_line.intpol(1);
   driver_line.ihold(1);
   driver_line.irun(31);
-  driver_line.iholddelay(1);
+  //driver_line.TPOWERDOWN(2);
+  //driver_line.iholddelay(2);
 
-  //driver.en_spreadCycle(false);      // Toggle spreadCycle on TMC2208
-  driver_line.pwm_autoscale(true);     // Needed for stealthChop
+  //driver.en_spreadCycle(false);
+  driver_line.pwm_autoscale(true);
 
 
   /*
@@ -126,7 +128,7 @@ void setup() {
   
   stepper_arm = new AccelStepper(step_arm, step_arm);  // Yes, they are the same
   stepper_arm->setMaxSpeed(50L * arm_MICROSTEPS);
-  stepper_arm->setAcceleration(50L * arm_MICROSTEPS);
+  stepper_arm->setAcceleration(25L * arm_MICROSTEPS);
   
   pinMode(ARM_STEP_PIN, OUTPUT);
   digitalWrite(ARM_STEP_PIN, LOW);
@@ -134,8 +136,8 @@ void setup() {
   digitalWrite(ARM_DIR_PIN, LOW);
   
   stepper_line = new AccelStepper(step_line, step_line);
-  stepper_line->setMaxSpeed(1000L * line_MICROSTEPS);
-  stepper_line->setAcceleration(400L * line_MICROSTEPS);
+  stepper_line->setMaxSpeed(500L * line_MICROSTEPS);
+  stepper_line->setAcceleration(1000L * line_MICROSTEPS);
   
   pinMode(LINE_STEP_PIN, OUTPUT);
   digitalWrite(LINE_STEP_PIN, LOW);
