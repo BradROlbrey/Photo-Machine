@@ -1,4 +1,5 @@
 
+
 #include <TMCStepper.h>
 #include <AccelStepper.h>
 #include <Wire.h>
@@ -8,19 +9,24 @@
 /*
  *  TMC2208 Driver
  */
-#define SW_RX  12  // SoftwareSerial receive pin
-#define SW_TX  11  // SoftwareSerial transmit pin
 #define R_SENSE 0.11f 
-TMC2208Stepper driver(SW_RX, SW_TX, R_SENSE);
+
+#define arm_SW_RX  12  // SoftwareSerial receive pin, don't think this is used. I've left it unplugged this whole time.
+#define arm_SW_TX  4  // SoftwareSerial transmit pin
+TMC2208Stepper driver_arm(arm_SW_RX, arm_SW_TX, R_SENSE);
 // Seeing as how I pass those in as parameters, I could probably control two different drivers
 // easily enough by just having two instances, esp since it's software serial.
+#define arm_MICROSTEPS 256L  // Don't do zero; I changed the library with the first program that has this comment.
 
-#define MICROSTEPS 256L  // Don't do zero; I changed the library with the first program that has this comment.
+#define line_SW_RX 12
+#define line_SW_TX 11
+TMC2208Stepper driver_line(line_SW_RX, line_SW_TX, R_SENSE);
+#define line_MICROSTEPS 16L
+
 
 // Don't think these need to be volatile because they're read-only.
-const long TOTAL_STEPS_AROUND = 200L * MICROSTEPS;
-const long TOTAL_STEPS_UP = 300L * MICROSTEPS;
-//const long TOTAL_STEPS_UP = 50L * MICROSTEPS;
+const long TOTAL_STEPS_AROUND = 200L * arm_MICROSTEPS;
+const long TOTAL_STEPS_UP = 300L * line_MICROSTEPS;
 
 /*
  *  AccelStepper
@@ -74,22 +80,42 @@ void setup() {
   /*
    *  TMC2208 Driver
    */
-  driver.beginSerial(9600);     // SW UART drivers
+  // ARM
+  driver_arm.beginSerial(9600);       // SW UART drivers
 
-  driver.begin();                 // SPI: Init CS pins and possible SW SPI pins
-                                  // UART: Init SW UART (if selected) with default 115200 baudrate
-  driver.toff(5);                 // Enables driver in software
-  driver.microsteps(MICROSTEPS);  // Set microsteps to whatever
+  driver_arm.begin();                 // SPI: Init CS pins and possible SW SPI pins
+                                      // UART: Init SW UART (if selected) with default 115200 baudrate
+  driver_arm.toff(5);                 // Enables driver in software
+  driver_arm.microsteps(arm_MICROSTEPS);  // Set microsteps to whatever
 
-  driver.I_scale_analog(1);
-  driver.internal_Rsense(0);
+  driver_arm.I_scale_analog(1);
+  driver_arm.internal_Rsense(0);
   //driver.intpol(0);
-  driver.ihold(1);
-  driver.irun(31);
-  driver.iholddelay(15);
+  driver_arm.ihold(1);
+  driver_arm.irun(31);
+  driver_arm.iholddelay(1);
 
-//driver.en_spreadCycle(false);   // Toggle spreadCycle on TMC2208
-  driver.pwm_autoscale(true);     // Needed for stealthChop
+  //driver.en_spreadCycle(false);     // Toggle spreadCycle on TMC2208
+  driver_arm.pwm_autoscale(true);     // Needed for stealthChop
+
+  
+  // LINE
+  driver_line.beginSerial(9600);       // SW UART drivers
+
+  driver_line.begin();                 // SPI: Init CS pins and possible SW SPI pins
+                                       // UART: Init SW UART (if selected) with default 115200 baudrate
+  driver_line.toff(5);                 // Enables driver in software
+  driver_line.microsteps(line_MICROSTEPS);  // Set microsteps to whatever
+
+  driver_line.I_scale_analog(1);
+  driver_line.internal_Rsense(0);
+  //driver.intpol(0);
+  driver_line.ihold(1);
+  driver_line.irun(31);
+  driver_line.iholddelay(1);
+
+  //driver.en_spreadCycle(false);      // Toggle spreadCycle on TMC2208
+  driver_line.pwm_autoscale(true);     // Needed for stealthChop
 
 
   /*
@@ -99,8 +125,8 @@ void setup() {
   digitalWrite(ENA_PIN, HIGH);  // HIGH is disabled
   
   stepper_arm = new AccelStepper(step_arm, step_arm);  // Yes, they are the same
-  stepper_arm->setMaxSpeed(50L * MICROSTEPS);
-  stepper_arm->setAcceleration(50L * MICROSTEPS);
+  stepper_arm->setMaxSpeed(50L * arm_MICROSTEPS);
+  stepper_arm->setAcceleration(50L * arm_MICROSTEPS);
   
   pinMode(ARM_STEP_PIN, OUTPUT);
   digitalWrite(ARM_STEP_PIN, LOW);
@@ -108,8 +134,8 @@ void setup() {
   digitalWrite(ARM_DIR_PIN, LOW);
   
   stepper_line = new AccelStepper(step_line, step_line);
-  stepper_line->setMaxSpeed(100L * MICROSTEPS);
-  stepper_line->setAcceleration(100L * MICROSTEPS);
+  stepper_line->setMaxSpeed(1000L * line_MICROSTEPS);
+  stepper_line->setAcceleration(400L * line_MICROSTEPS);
   
   pinMode(LINE_STEP_PIN, OUTPUT);
   digitalWrite(LINE_STEP_PIN, LOW);
@@ -163,6 +189,7 @@ void loop() {
     Serial.println("Moving set to 0");
     moving = 0;
     executed_moving = false;
+
   }
   
 
@@ -246,7 +273,7 @@ void loop() {
   Serial.println(executed);*/
     
   if (executed_processing) {
-    delay(1000);  // To force check Pi's wait_for_processing
+    //delay(1000);  // To force check Pi's wait_for_processing
     // In here so that outer loop can run and Arduino can "finish" moving.
     Serial.println("executed_processing ");
     next_byte = ' ';
@@ -319,10 +346,8 @@ void step_arm() {
   digitalWrite(ARM_STEP_PIN, HIGH);
   digitalWrite(ARM_STEP_PIN, LOW);
 }
-void step_back_arm() { /* Just reverse direction and call step_arm() */ }
 
 void step_line() {
   digitalWrite(LINE_STEP_PIN, HIGH);
   digitalWrite(LINE_STEP_PIN, LOW);
 }
-void step_back_line() { }
