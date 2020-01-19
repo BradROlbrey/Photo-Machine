@@ -7,6 +7,7 @@ import smbus
 from time import sleep
 from picamera import PiCamera
 from datetime import datetime
+import signal
 
 
 # Initialize I2C (SMBus)
@@ -19,6 +20,7 @@ def main():
 	camera = PiCamera()
 	camera.resolution = (3280, 2464)
 	camera.vflip = True
+	camera.hflip = True
 	camera.start_preview()
 	
 	
@@ -27,22 +29,7 @@ def main():
 	'''
 	# Disable the motors so we can manually manipulate the machine.
 	print("Disabling motors")
-	for i in range(1):
-		write_byte(ord('q'), "OSError: Failed to disable motor drivers", 1)
-			# For some reason, sending first 'q' is unreliable. Delay does not fix,
-			#	so sending multiple q's with small delays.
-			# Oddly enough, the Arduino's receive function recognizes the 'q', but
-			#	then it never goes into the switch statement.
-			# Sending 'q' or other letters doesn't appear to be the slightest problem
-			#	later on, thankfully.
-	
-	# try:
-	# 	for i in range(5):
-	# 		bus.write_byte(arduino_addr, ord('q'))
-	# 		sleep(.1)
-	# except OSError:
-	#	print("OSError: Failed to disable motor drivers")
-	#	exit(1)
+	write_byte(ord('q'), "OSError: Failed to disable motor drivers", 1)
 	
 	print("Make sure the Arm is rotated such that the motor wires twist properly and Slider is at bottom-most position")
 	
@@ -211,6 +198,35 @@ def read_bytes_from_arduino(which_byte):
 	print("Failed 10 times trying to read from Arduino, something wrong, exiting program.")
 
 
+# It's bad practice to do things in signal handlers, so we set a global
+# 	flag and check it in the main function.
+# Except I guess the Python interpreter already kinda does this for us,
+# 	I guess it could still be in a library call, but I couldn't get
+# 	it to set the flag such that it was recognized outside the handler
+# 	function and it probably doesn't matter too much in the grand scheme.
+def reset_armature(sig, frame):
+	print("You pressed ctrl+C")
+	print("Reseting armature and exiting")
+	
+	wait_for_moving()
+	write_byte(ord('s'))
+	wait_for_moving()
+	write_byte(ord('a'))
+	wait_for_moving()
+	print("Finished! Disabling motor drivers")
+	write_byte(ord('q'), "OSError: Failed to disable motor drivers")
+
+	exit(0)
+
+def pause_program(sig, frame):
+	print("You pressed ctrl+Z")
+	print("Pausing program")
+
+	input("Press Enter to continue")
+
+
 if __name__ == '__main__':
+	signal.signal(signal.SIGINT, reset_armature)
+	signal.signal(signal.SIGTSTP, pause_program)
 	main()
 		
