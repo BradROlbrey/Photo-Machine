@@ -330,6 +330,10 @@ void receiveEvent(int howMany) {
   
     steps_per_photo_around = TOTAL_STEPS_AROUND / num_photos_per_rev;
     steps_per_level = TOTAL_STEPS_UP / (num_levels - 1);
+
+    // Reset AccelStepper instances to 0, because user might have manually reset the arm.
+    stepper_arm->setCurrentPosition(0);
+    stepper_line->setCurrentPosition(0);
   }
 }
 // Send data to Pi
