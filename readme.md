@@ -42,4 +42,4 @@ Closeup of the breadboard mounts. The mounts for the raspberry pi were similar. 
 
 <img src="https://user-images.githubusercontent.com/17125101/198073388-f0bed18c-129d-49d0-b770-1cb279cac40e.jpg" width="60%" />
 
-I designed both in Autodesk Inventor and printed them on my Prusa MK3.
+I 3D modeled all printed parts in Autodesk Inventor and printed them on my Prusa MK3.
