@@ -31,9 +31,11 @@ New upper stepper motor mount. Closeup of the wheel-reel mechanism on lower step
 <img src="https://user-images.githubusercontent.com/17125101/198067940-1436de13-2314-4371-bd11-aa8a580b4412.jpg" width="60%" />
 
 
-Closeup of camera mount, camera not included :p
+Closeup of camera mount (an earlier version) with camera, showing it slotted into place.
 
-You can see the eye screws where the fishing line attaches, allows the lower stepper motor and its wheel/reel to pull the camera up and down the armature.
+<img src="https://user-images.githubusercontent.com/17125101/201186878-6733e588-1771-45b1-9bb7-181623c5eb90.jpg" width="60%" />
+
+Closeup of camera mount (current version) without camera but attached to armature. You can see the eye screws where the fishing line attaches, allows the lower stepper motor and its wheel/reel to pull the camera up and down the armature.
 
 <img src="https://user-images.githubusercontent.com/17125101/198073189-1bd39de6-0d0a-4a27-b7a1-012a81ce77aa.jpg" width="60%" />
 
