@@ -1,13 +1,15 @@
-After discovering the concept of photogrammetry - synthesizing pictures of an object or scene to make a 3D model of it - I decided to make a robot that would take pictures of items for me, so I could have 3D models of them!
+## Photogrammetry Machine
 
-A Raspberry Pi with a camera module controls an Arduino over I2C. Between each picture, the pi signals the Arduino to move the camera. The Arduino controls two TMC2208 stepper drivers, each of which controls a stepper motor. One motor is for rotating the armature around the object, and the other is for moving the camera up and down the armature. In this manner, pictures can be taken all around an object. I decided to spin the camera around the object instead of simply spinning the object itself; this way the background moves with the image, so as to not confuse the image processing software.
+After discovering the concept of photogrammetry - synthesizing pictures of an object or scene to make a 3D model of it - I decided to make a robot to take pictures of items for me, so I could have 3D models of them!
 
-The pictures are then imported into [Meshroom](https://alicevision.org/) (I had no part in creating this), which constructs a textured 3D model of the object from the images.
+A Raspberry Pi with a camera module takes pictures and controls an Arduino over I2C. Between each picture, the pi signals the Arduino to move the camera. The Arduino controls two TMC2208 stepper drivers, each of which controls a stepper motor. One motor is for rotating the armature around the object, and the other is for moving the camera up and down the armature. In this manner, pictures can be taken all around an object. I decided to spin the camera around the object instead of simply spinning the object itself; this way the background moves with the image, so as to not confuse the image processing software.
 
-I 3D modeled all printed parts in Autodesk Inventor and printed them on my Prusa MK3.
+The Pi also provides Ethernet/USB so I can conveniently get those pictures to a more powerful computer. The pictures are imported into [Meshroom](https://alicevision.org/) (I had no part in creating this), which processes them to construct a textured 3D model of the object.
+
+The orange pieces in the pictures below are all parts I 3D modeled in Autodesk Inventor and 3D printed on my Prusa MK3.
 
 
-### How It Works
+## How It Works
 
 This is the setup of the first design.
 ![setup](https://github.com/BradROlbrey/Photo-Machine/blob/v1_results/setup.png?raw=true)
@@ -24,13 +26,13 @@ The lighting of the scene the object was photoed in is preserved, baked into the
 <img src="https://raw.githubusercontent.com/BradROlbrey/Photo-Machine/v1_results/Pinecone.png" width="100%" />
 
 
-# New Design
+## New Design
 
 Same functionality but in a more put-together form factor, aside from the lighting. My dad did the metalwork (pop rivets and aluminum bending/cutting). The arm is the same, carried over from the previous model. The electronics are the same as well, but whereas previously they were strewn about the table top, they are now mounted to the frame of the photomachine. The camera appears to have ran off at some point.
 ![1-overview](https://user-images.githubusercontent.com/17125101/198064809-aea53960-e34f-4496-b2ac-d83edf908519.jpg)
 
 
-Below is the Raspberry Pi, and above is the breadboard with the other components. Power comes in through the barrel plug in the middle. 
+Below is the Raspberry Pi, and above is the breadboard with the other components. Power comes in through the barrel plug in between. 
 
 <img alt="Raspberry Pi Mounted CloseUp" src="https://user-images.githubusercontent.com/17125101/211061392-f3a7742a-5123-484f-b58d-f8734200073b.jpg" width="60%" />
 
@@ -48,7 +50,7 @@ Closeup of camera mount (an earlier version) with camera, showing it slotted int
 
 <img src="https://user-images.githubusercontent.com/17125101/201186878-6733e588-1771-45b1-9bb7-181623c5eb90.jpg" width="60%" />
 
-Closeup of camera mount (current version) without camera but attached to armature. You can see the eye screws where the fishing line attaches, allows the lower stepper motor and its wheel/reel to pull the camera up and down the armature.
+Closeup of camera mount (current version) without camera but attached to armature. You can see the eye screws where the fishing line attaches, allowing the lower stepper motor and its wheel/reel to pull the camera up and down the armature.
 
 <img src="https://user-images.githubusercontent.com/17125101/198073189-1bd39de6-0d0a-4a27-b7a1-012a81ce77aa.jpg" width="60%" />
 
