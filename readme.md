@@ -29,7 +29,7 @@ The lighting of the scene the object was photoed in is preserved, baked into the
 ## New Design
 
 Same functionality but in a more put-together form factor, aside from the lighting. My dad did the metalwork (pop rivets and aluminum bending/cutting). The arm is the same, carried over from the previous model. The electronics are the same as well, but whereas previously they were strewn about the table top, they are now mounted to the frame of the photomachine. The camera appears to have ran off at some point.
-![1-overview](https://user-images.githubusercontent.com/17125101/198064809-aea53960-e34f-4496-b2ac-d83edf908519.jpg)
+![1-overview-2_cropped](https://user-images.githubusercontent.com/17125101/211129272-a2c9849b-c57e-46fa-b7ff-fb65595e3c96.jpg)
 
 
 Below is the Raspberry Pi, and above is the breadboard with the other components. Power comes in through the barrel plug in between. 
@@ -46,7 +46,7 @@ New upper stepper motor mount. Closeup of the wheel-reel mechanism on lower step
 <img src="https://user-images.githubusercontent.com/17125101/198067940-1436de13-2314-4371-bd11-aa8a580b4412.jpg" width="60%" />
 
 
-Closeup of camera mount (an earlier version) with camera, showing it slotted into place.
+Closeup of camera mount (an earlier version, still on the printbed no less!) with camera, showing it slotted into place.
 
 <img src="https://user-images.githubusercontent.com/17125101/201186878-6733e588-1771-45b1-9bb7-181623c5eb90.jpg" width="60%" />
 
